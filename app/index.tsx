@@ -1,20 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image as RNImage,
+  ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
+  Image as RNImage,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 
 import { Hotspot } from '@/components/Hotspot';
+import { KioskNavColumn } from '@/components/KioskNavColumn';
 import { HOTSPOTS } from '@/constants/hotspots';
+import {
+  KIOSK_SIDE_BUTTONS,
+  type KioskExternalButton,
+  type KioskModalContent,
+  type KioskScreenButton,
+  type KioskSideButtonDefinition,
+} from '@/constants/kioskButtons';
 import { KIOSK_CONFIG } from '@/constants/kioskConfig';
 
 const POSTER_SOURCE = require('@/assets/descale-bg.png');
+const DEFAULT_MODAL_HINT = 'Tap outside the panel to return to the kiosk home screen.';
 
 type PosterBounds = {
   renderedW: number;
@@ -22,6 +34,26 @@ type PosterBounds = {
   offsetX: number;
   offsetY: number;
 };
+
+type ModalSource = 'hotspot' | 'side-button' | 'system';
+
+type ActiveTextModalState = KioskModalContent & {
+  kind: 'text';
+  id: string;
+  source: ModalSource;
+};
+
+type ActiveWebModalState = {
+  kind: 'web';
+  id: string;
+  source: 'side-button';
+  eyebrow: string;
+  title: string;
+  url: string;
+  hint: string;
+};
+
+type ActiveModalState = ActiveTextModalState | ActiveWebModalState;
 
 function getContainedPosterBounds(
   layoutWidth: number,
@@ -41,6 +73,38 @@ function getContainedPosterBounds(
   };
 }
 
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function buildTextModalState(
+  id: string,
+  source: ModalSource,
+  content: KioskModalContent
+): ActiveTextModalState {
+  return {
+    kind: 'text',
+    id,
+    source,
+    eyebrow: content.eyebrow,
+    title: content.title,
+    body: content.body,
+    hint: content.hint ?? DEFAULT_MODAL_HINT,
+  };
+}
+
+function buildWebModalState(button: KioskExternalButton): ActiveWebModalState {
+  return {
+    kind: 'web',
+    id: button.id,
+    source: 'side-button',
+    eyebrow: button.eyebrow,
+    title: button.label.replace(/\n/g, ' '),
+    url: button.externalUrl,
+    hint: 'Use Browser if the page needs to leave kiosk mode, or Close to return to the dashboard.',
+  };
+}
+
 export default function KioskScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -49,21 +113,55 @@ export default function KioskScreen() {
 
   const [posterBounds, setPosterBounds] = useState<PosterBounds | null>(null);
   const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
+  const [activeNavButtonId, setActiveNavButtonId] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModalState | null>(null);
+  const [isWebViewLoading, setIsWebViewLoading] = useState(false);
+  const [webViewError, setWebViewError] = useState<string | null>(null);
+  const [webViewKey, setWebViewKey] = useState(0);
 
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isLandscape = width >= height;
   const isLargeDisplay = width >= 1280;
-  const framePadding = isLargeDisplay ? 24 : 14;
-  const posterPaddingX = isLargeDisplay ? 32 : 18;
-  const posterPaddingY = height >= 850 ? 28 : 18;
+  const framePadding = isLargeDisplay ? 26 : 16;
+  const posterPaddingX = isLargeDisplay ? 40 : 24;
+  const posterPaddingY = height >= 850 ? 34 : 20;
   const modalWidth = Math.min(width - Math.max(insets.left, insets.right) * 2 - 64, KIOSK_CONFIG.modal.maxWidth);
+  const webModalWidth = Math.min(width - Math.max(insets.left, insets.right) * 2 - 44, 1400);
+  const webModalHeight = Math.min(height - Math.max(insets.top, insets.bottom) * 2 - 36, 860);
   const modalTitleSize = isLargeDisplay ? 38 : 32;
   const modalBodySize = isLargeDisplay ? 23 : 19;
-
-  const activeHotspot = useMemo(
-    () => HOTSPOTS.find((hotspot) => hotspot.id === activeHotspotId) ?? null,
-    [activeHotspotId]
+  const webModalTitleSize = isLargeDisplay ? 30 : 26;
+  const stageHorizontalPadding = isLargeDisplay ? 30 : 18;
+  const stageVerticalPadding = height >= 900 ? 28 : 18;
+  const contentGap = clamp(width * 0.012, 12, 22);
+  const topRailGap = clamp(width * 0.02, 12, 28);
+  const buttonSize = clamp(
+    Math.min(width * (isLandscape ? 0.155 : 0.205), (height - insets.top - insets.bottom - 180) / 3),
+    172,
+    isLargeDisplay ? 248 : 216
   );
+  const stageTitleSize = isLargeDisplay ? 34 : 28;
+
+  const leftButtons = useMemo(
+    () =>
+      KIOSK_SIDE_BUTTONS.filter((button) => button.side === 'left').sort(
+        (left, right) => left.order - right.order
+      ),
+    []
+  );
+
+  const rightButtons = useMemo(
+    () =>
+      KIOSK_SIDE_BUTTONS.filter((button) => button.side === 'right').sort(
+        (left, right) => left.order - right.order
+      ),
+    []
+  );
+
+  const hasOverlayOpen = activeModal !== null;
+  const activeTextModal = activeModal?.kind === 'text' ? activeModal : null;
+  const activeWebModal = activeModal?.kind === 'web' ? activeModal : null;
 
   const clearIdleTimeout = useCallback(() => {
     if (idleTimeoutRef.current) {
@@ -72,17 +170,25 @@ export default function KioskScreen() {
     }
   }, []);
 
-  const closeActiveHotspot = useCallback(() => {
-    setActiveHotspotId(null);
+  const clearWebViewState = useCallback(() => {
+    setIsWebViewLoading(false);
+    setWebViewError(null);
   }, []);
+
+  const resetToHome = useCallback(() => {
+    setActiveHotspotId(null);
+    setActiveNavButtonId(null);
+    setActiveModal(null);
+    clearWebViewState();
+  }, [clearWebViewState]);
 
   const resetIdleTimer = useCallback(() => {
     clearIdleTimeout();
     idleTimeoutRef.current = setTimeout(() => {
       idleTimeoutRef.current = null;
-      closeActiveHotspot();
+      resetToHome();
     }, KIOSK_CONFIG.idleTimeoutMs);
-  }, [clearIdleTimeout, closeActiveHotspot]);
+  }, [clearIdleTimeout, resetToHome]);
 
   const registerInteraction = useCallback(() => {
     resetIdleTimer();
@@ -90,16 +196,138 @@ export default function KioskScreen() {
 
   const handleCloseModal = useCallback(() => {
     registerInteraction();
-    closeActiveHotspot();
-  }, [closeActiveHotspot, registerInteraction]);
+    resetToHome();
+  }, [registerInteraction, resetToHome]);
 
   const handleSelectHotspot = useCallback(
     (hotspotId: string) => {
+      const hotspot = HOTSPOTS.find((item) => item.id === hotspotId);
+      if (!hotspot) {
+        return;
+      }
+
       registerInteraction();
+      clearWebViewState();
       setActiveHotspotId(hotspotId);
+      setActiveNavButtonId(null);
+      setActiveModal(
+        buildTextModalState(hotspot.id, 'hotspot', {
+          eyebrow: KIOSK_CONFIG.modal.eyebrow,
+          title: hotspot.title,
+          body: hotspot.body,
+          hint: 'Tap outside the panel to return to the poster view.',
+        })
+      );
     },
-    [registerInteraction]
+    [clearWebViewState, registerInteraction]
   );
+
+  const openUnavailableLinkModal = useCallback((button: KioskSideButtonDefinition) => {
+    clearWebViewState();
+    setActiveNavButtonId(button.id);
+    setActiveModal(
+      buildTextModalState(button.id, 'system', {
+        eyebrow: 'Link unavailable',
+        title: button.label.replace(/\n/g, ' '),
+        body: 'This external destination could not be opened on the device. Verify the kiosk has a browser available and replace the placeholder URL if needed.',
+        hint: 'Close this panel to return to the kiosk dashboard.',
+      })
+    );
+  }, [clearWebViewState]);
+
+  const handleScreenButton = useCallback(
+    (button: KioskScreenButton) => {
+      clearWebViewState();
+      setActiveHotspotId(null);
+      setActiveNavButtonId(button.id);
+
+      if (button.screenId === 'pump-home') {
+        setActiveModal(null);
+        return;
+      }
+
+      if (button.fallbackModalContent) {
+        setActiveModal(buildTextModalState(button.id, 'side-button', button.fallbackModalContent));
+        return;
+      }
+
+      setActiveModal(
+        buildTextModalState(button.id, 'system', {
+          eyebrow: 'Screen reserved',
+          title: button.label.replace(/\n/g, ' '),
+          body: 'This action type is wired for future in-app navigation. Add a local route later and reuse the same data model without changing the layout.',
+        })
+      );
+    },
+    [clearWebViewState]
+  );
+
+  const handleSelectSideButton = useCallback(
+    async (button: KioskSideButtonDefinition) => {
+      registerInteraction();
+
+      if (button.actionType === 'modal') {
+        clearWebViewState();
+        setActiveHotspotId(null);
+        setActiveNavButtonId(button.id);
+        setActiveModal(buildTextModalState(button.id, 'side-button', button.modalContent));
+        return;
+      }
+
+      if (button.actionType === 'screen') {
+        handleScreenButton(button);
+        return;
+      }
+
+      setActiveHotspotId(null);
+      setActiveNavButtonId(button.id);
+      clearWebViewState();
+
+      try {
+        const canOpen = await Linking.canOpenURL(button.externalUrl);
+
+        if (!canOpen) {
+          openUnavailableLinkModal(button);
+          return;
+        }
+
+        setActiveModal(buildWebModalState(button));
+        setIsWebViewLoading(true);
+        setWebViewError(null);
+        setWebViewKey((current) => current + 1);
+      } catch {
+        openUnavailableLinkModal(button);
+      }
+    },
+    [clearWebViewState, handleScreenButton, openUnavailableLinkModal, registerInteraction]
+  );
+
+  const handleOpenWebModalInBrowser = useCallback(async () => {
+    if (!activeWebModal) {
+      return;
+    }
+
+    registerInteraction();
+
+    try {
+      const canOpen = await Linking.canOpenURL(activeWebModal.url);
+      if (!canOpen) {
+        setWebViewError('This device could not open the system browser for the current page.');
+        return;
+      }
+
+      await Linking.openURL(activeWebModal.url);
+    } catch {
+      setWebViewError('This device could not open the system browser for the current page.');
+    }
+  }, [activeWebModal, registerInteraction]);
+
+  const handleRetryWebView = useCallback(() => {
+    registerInteraction();
+    setWebViewError(null);
+    setIsWebViewLoading(true);
+    setWebViewKey((current) => current + 1);
+  }, [registerInteraction]);
 
   const handlePosterLayout = useCallback(
     (layoutWidth: number, layoutHeight: number) => {
@@ -121,50 +349,126 @@ export default function KioskScreen() {
 
   return (
     <View style={styles.root} onTouchStart={registerInteraction}>
-      <View style={[styles.frame, { padding: framePadding }]}>
+      <View style={styles.ambientLayer} pointerEvents="none">
+        <View style={[styles.ambientOrb, styles.ambientOrbLeft]} />
+        <View style={[styles.ambientOrb, styles.ambientOrbRight]} />
+      </View>
+
+      <View
+        style={[
+          styles.frame,
+          {
+            paddingTop: Math.max(insets.top, framePadding),
+            paddingBottom: Math.max(insets.bottom, framePadding),
+            paddingLeft: Math.max(insets.left, framePadding),
+            paddingRight: Math.max(insets.right, framePadding),
+          },
+        ]}>
         <View style={styles.stageFrame}>
           <RNImage source={POSTER_SOURCE} resizeMode="cover" style={styles.stageBackground} />
           <View style={styles.stageTint} />
+          <View style={styles.stageGlowLeft} />
+          <View style={styles.stageGlowRight} />
 
-          <View style={styles.posterCanvas} pointerEvents="box-none">
-            <View
-              style={[
-                styles.posterCanvasInner,
-                {
-                  paddingHorizontal: posterPaddingX,
-                  paddingVertical: posterPaddingY,
-                },
-              ]}>
-              <View
-                style={styles.posterStage}
-                onLayout={(event) => {
-                  const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
-                  handlePosterLayout(layoutWidth, layoutHeight);
-                }}>
-                <RNImage source={POSTER_SOURCE} resizeMode="contain" style={styles.posterImage} />
+          <View
+            style={[
+              styles.stageContent,
+              {
+                paddingHorizontal: stageHorizontalPadding,
+                paddingVertical: stageVerticalPadding,
+              },
+            ]}>
+            <View style={[styles.topRail, { gap: topRailGap, justifyContent: 'center' }]}>
+              <View style={[styles.brandBlock, { alignItems: 'center' }]}>
+    
+                <Text style={[styles.brandTitle, { fontSize: (stageTitleSize + 8) * 2, lineHeight: (stageTitleSize + 16) * 2 }]}>
+                Upscale your descale.
+                </Text>
+              </View>
 
-                <View style={styles.hotspotLayer} pointerEvents="box-none">
-                  {posterBounds
-                    ? HOTSPOTS.map((hotspot) => {
-                        const centerX = posterBounds.offsetX + posterBounds.renderedW * (hotspot.x / 100);
-                        const centerY = posterBounds.offsetY + posterBounds.renderedH * (hotspot.y / 100);
+            </View>
 
-                        return (
-                          <Hotspot
-                            key={hotspot.id}
-                            title={hotspot.title}
-                            centerX={centerX}
-                            centerY={centerY}
-                            isActive={hotspot.id === activeHotspotId}
-                            isMuted={activeHotspotId !== null && hotspot.id !== activeHotspotId}
-                            attractMode={activeHotspotId === null}
-                            onPress={() => handleSelectHotspot(hotspot.id)}
-                          />
-                        );
-                      })
-                    : null}
+            <View style={[styles.contentRow, { gap: contentGap }]}>
+              <KioskNavColumn
+                activeId={activeNavButtonId}
+                buttonSize={buttonSize}
+                isDimmed={hasOverlayOpen}
+                items={leftButtons}
+                onPress={(button) => {
+                  void handleSelectSideButton(button);
+                }}
+                side="left"
+              />
+
+              <View style={styles.centerColumn}>
+
+
+                <View style={styles.posterCard}>
+                  <View style={styles.posterCardGlow} pointerEvents="none" />
+                  <View style={styles.posterCanvas} pointerEvents="box-none">
+                    <View
+                      style={[
+                        styles.posterCanvasInner,
+                        {
+                          paddingHorizontal: posterPaddingX,
+                          paddingVertical: posterPaddingY,
+                        },
+                      ]}>
+                      <View
+                        style={styles.posterStage}
+                        onLayout={(event) => {
+                          const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
+                          handlePosterLayout(layoutWidth, layoutHeight);
+                        }}>
+                        <RNImage source={POSTER_SOURCE} resizeMode="contain" style={styles.posterImage} />
+
+                        <View style={styles.hotspotLayer} pointerEvents="box-none">
+                          {posterBounds
+                            ? HOTSPOTS.map((hotspot) => {
+                                const centerX =
+                                  posterBounds.offsetX + posterBounds.renderedW * (hotspot.x / 100);
+                                const centerY =
+                                  posterBounds.offsetY + posterBounds.renderedH * (hotspot.y / 100);
+
+                                return (
+                                  <Hotspot
+                                    key={hotspot.id}
+                                    title={hotspot.title}
+                                    centerX={centerX}
+                                    centerY={centerY}
+                                    isActive={hotspot.id === activeHotspotId}
+                                    isMuted={activeHotspotId !== null && hotspot.id !== activeHotspotId}
+                                    attractMode={activeHotspotId === null}
+                                    onPress={() => handleSelectHotspot(hotspot.id)}
+                                  />
+                                );
+                              })
+                            : null}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.posterFooter}>
+                    <View style={styles.posterLegend}>
+                      <View style={styles.posterLegendDot} />
+                  
+                    </View>
+
+                  </View>
                 </View>
               </View>
+
+              <KioskNavColumn
+                activeId={activeNavButtonId}
+                buttonSize={buttonSize}
+                isDimmed={hasOverlayOpen}
+                items={rightButtons}
+                onPress={(button) => {
+                  void handleSelectSideButton(button);
+                }}
+                side="right"
+              />
             </View>
           </View>
         </View>
@@ -175,7 +479,7 @@ export default function KioskScreen() {
         hardwareAccelerated
         statusBarTranslucent
         animationType="fade"
-        visible={Boolean(activeHotspot)}
+        visible={Boolean(activeModal)}
         onRequestClose={handleCloseModal}>
         <View
           style={[
@@ -191,57 +495,189 @@ export default function KioskScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseModal} />
 
           <View style={styles.modalContent} pointerEvents="box-none">
-            <View
-              accessibilityViewIsModal
-              style={[
-                styles.modalCard,
-                {
-                  width: modalWidth,
-                  paddingHorizontal: isLargeDisplay ? 36 : 28,
-                  paddingVertical: isLargeDisplay ? 34 : 26,
-                },
-              ]}>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalEyebrowRow}>
-                  <View style={styles.modalEyebrowAccent} />
-                  <Text style={styles.modalEyebrow}>{KIOSK_CONFIG.modal.eyebrow}</Text>
+            {activeWebModal ? (
+              <View
+                accessibilityViewIsModal
+                style={[
+                  styles.webModalCard,
+                  {
+                    width: webModalWidth,
+                    height: webModalHeight,
+                  },
+                ]}>
+                <View style={styles.webModalHeader}>
+                  <View style={styles.modalEyebrowRow}>
+                    <View style={styles.modalEyebrowAccent} />
+                    <Text style={styles.modalEyebrow}>{activeWebModal.eyebrow}</Text>
+                  </View>
+
+                  <View style={styles.webModalHeaderActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Open current page in browser"
+                      onPress={() => {
+                        void handleOpenWebModalInBrowser();
+                      }}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        pressed && styles.secondaryButtonPressed,
+                      ]}>
+                      <Text style={styles.secondaryButtonText}>Browser</Text>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Close kiosk web panel"
+                      onPress={handleCloseModal}
+                      style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}>
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </Pressable>
+                  </View>
                 </View>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close technical detail panel"
-                  onPress={handleCloseModal}
-                  style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}>
-                  <Text style={styles.closeButtonText}>Close</Text>
-                </Pressable>
-              </View>
+                <Text
+                  style={[
+                    styles.webModalTitle,
+                    {
+                      fontSize: webModalTitleSize,
+                      lineHeight: webModalTitleSize + 6,
+                    },
+                  ]}>
+                  {activeWebModal.title}
+                </Text>
 
-              <Text
+                <View style={styles.webUrlBar}>
+                  <Text numberOfLines={1} style={styles.webUrlText}>
+                    {activeWebModal.url}
+                  </Text>
+                </View>
+
+                <View style={styles.webViewFrame}>
+                  <WebView
+                    key={`${activeWebModal.id}-${webViewKey}`}
+                    originWhitelist={['http://*', 'https://*']}
+                    source={{ uri: activeWebModal.url }}
+                    setSupportMultipleWindows={false}
+                    style={styles.webView}
+                    onError={(event) => {
+                      setIsWebViewLoading(false);
+                      setWebViewError(
+                        event.nativeEvent.description || 'Unable to load the page in kiosk mode.'
+                      );
+                    }}
+                    onHttpError={(event) => {
+                      setIsWebViewLoading(false);
+                      setWebViewError(`The site returned ${event.nativeEvent.statusCode}.`);
+                    }}
+                    onLoadEnd={() => {
+                      setIsWebViewLoading(false);
+                    }}
+                    onLoadStart={() => {
+                      setIsWebViewLoading(true);
+                      setWebViewError(null);
+                    }}
+                  />
+
+                  {isWebViewLoading ? (
+                    <View style={styles.webStateOverlay}>
+                      <ActivityIndicator color={KIOSK_CONFIG.colors.accent} size="large" />
+                      <Text style={styles.webLoadingText}>Loading page…</Text>
+                    </View>
+                  ) : null}
+
+                  {webViewError ? (
+                    <View style={styles.webStateOverlay}>
+                      <Text style={styles.webStateTitle}>Unable to load this page</Text>
+                      <Text style={styles.webStateBody}>{webViewError}</Text>
+
+                      <View style={styles.webStateActions}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Retry loading page"
+                          onPress={handleRetryWebView}
+                          style={({ pressed }) => [
+                            styles.retryButton,
+                            pressed && styles.retryButtonPressed,
+                          ]}>
+                          <Text style={styles.retryButtonText}>Retry</Text>
+                        </Pressable>
+
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Open page in browser"
+                          onPress={() => {
+                            void handleOpenWebModalInBrowser();
+                          }}
+                          style={({ pressed }) => [
+                            styles.secondaryButton,
+                            pressed && styles.secondaryButtonPressed,
+                          ]}>
+                          <Text style={styles.secondaryButtonText}>Browser</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.modalFooter}>
+                  <Text style={styles.modalHint}>{activeWebModal.hint}</Text>
+                </View>
+              </View>
+            ) : (
+              <View
+                accessibilityViewIsModal
                 style={[
-                  styles.modalTitle,
+                  styles.modalCard,
                   {
-                    fontSize: modalTitleSize,
-                    lineHeight: modalTitleSize + 8,
+                    width: modalWidth,
+                    paddingHorizontal: isLargeDisplay ? 36 : 28,
+                    paddingVertical: isLargeDisplay ? 34 : 26,
                   },
                 ]}>
-                {activeHotspot?.title ?? ''}
-              </Text>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalEyebrowRow}>
+                    <View style={styles.modalEyebrowAccent} />
+                    <Text style={styles.modalEyebrow}>
+                      {activeTextModal?.eyebrow ?? KIOSK_CONFIG.modal.eyebrow}
+                    </Text>
+                  </View>
 
-              <Text
-                style={[
-                  styles.modalBody,
-                  {
-                    fontSize: modalBodySize,
-                    lineHeight: modalBodySize + 12,
-                  },
-                ]}>
-                {activeHotspot?.body ?? ''}
-              </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close kiosk detail panel"
+                    onPress={handleCloseModal}
+                    style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}>
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </Pressable>
+                </View>
 
-              <View style={styles.modalFooter}>
-                <Text style={styles.modalHint}>Tap outside the panel to return to the poster view.</Text>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    {
+                      fontSize: modalTitleSize,
+                      lineHeight: modalTitleSize + 8,
+                    },
+                  ]}>
+                  {activeTextModal?.title ?? ''}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.modalBody,
+                    {
+                      fontSize: modalBodySize,
+                      lineHeight: modalBodySize + 12,
+                    },
+                  ]}>
+                  {activeTextModal?.body ?? ''}
+                </Text>
+
+                <View style={styles.modalFooter}>
+                  <Text style={styles.modalHint}>{activeTextModal?.hint ?? DEFAULT_MODAL_HINT}</Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -253,6 +689,26 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: KIOSK_CONFIG.colors.background,
+  },
+  ambientLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  ambientOrb: {
+    position: 'absolute',
+    width: 420,
+    height: 420,
+    borderRadius: 999,
+    opacity: 0.38,
+  },
+  ambientOrbLeft: {
+    top: -160,
+    left: -120,
+    backgroundColor: KIOSK_CONFIG.colors.brandBlueSoft,
+  },
+  ambientOrbRight: {
+    right: -120,
+    bottom: -180,
+    backgroundColor: 'rgba(255,216,74,0.08)',
   },
   frame: {
     flex: 1,
@@ -273,8 +729,141 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: KIOSK_CONFIG.colors.frameTint,
   },
+  stageGlowLeft: {
+    position: 'absolute',
+    top: '18%',
+    left: -120,
+    width: 260,
+    height: 260,
+    borderRadius: 999,
+    backgroundColor: KIOSK_CONFIG.colors.brandBlueSoft,
+  },
+  stageGlowRight: {
+    position: 'absolute',
+    right: -100,
+    bottom: 42,
+    width: 220,
+    height: 220,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,216,74,0.10)',
+  },
+  stageContent: {
+    flex: 1,
+    gap: 16,
+  },
+  topRail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandBlock: {
+    flexShrink: 1,
+    gap: 4,
+  },
+  brandEyebrow: {
+    color: KIOSK_CONFIG.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  brandTitle: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontWeight: '700',
+  },
+  instructionPill: {
+    maxWidth: 470,
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: KIOSK_CONFIG.colors.border,
+    backgroundColor: KIOSK_CONFIG.colors.panelRaised,
+  },
+  instructionDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 999,
+    backgroundColor: KIOSK_CONFIG.colors.accent,
+  },
+  instructionText: {
+    flex: 1,
+    color: KIOSK_CONFIG.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  contentRow: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+  },
+  centerColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: 14,
+  },
+  posterHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: KIOSK_CONFIG.colors.border,
+    backgroundColor: KIOSK_CONFIG.colors.panel,
+  },
+  posterHeaderCopy: {
+    flexShrink: 1,
+    gap: 4,
+  },
+  posterEyebrow: {
+    color: KIOSK_CONFIG.colors.brandBlue,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  posterTitle: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 31,
+  },
+  posterSummary: {
+    maxWidth: 410,
+    flexShrink: 1,
+    color: KIOSK_CONFIG.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  posterCard: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    borderRadius: 34,
+    borderWidth: 1,
+    borderColor: KIOSK_CONFIG.colors.border,
+    backgroundColor: KIOSK_CONFIG.colors.surface,
+  },
+  posterCardGlow: {
+    position: 'absolute',
+    top: 30,
+    right: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 999,
+    backgroundColor: KIOSK_CONFIG.colors.brandBlueSoft,
+  },
   posterCanvas: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   posterCanvasInner: {
     flex: 1,
@@ -288,6 +877,38 @@ const styles = StyleSheet.create({
   },
   hotspotLayer: {
     ...StyleSheet.absoluteFillObject,
+  },
+  posterFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  posterLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  posterLegendDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: KIOSK_CONFIG.colors.accent,
+  },
+  posterLegendText: {
+    color: KIOSK_CONFIG.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  posterFooterText: {
+    color: KIOSK_CONFIG.colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -312,11 +933,39 @@ const styles = StyleSheet.create({
     },
     elevation: 18,
   },
+  webModalCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: KIOSK_CONFIG.colors.border,
+    backgroundColor: KIOSK_CONFIG.colors.modalSurface,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    elevation: 22,
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 18,
+  },
+  webModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  webModalHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   modalEyebrowRow: {
     flexDirection: 'row',
@@ -341,10 +990,75 @@ const styles = StyleSheet.create({
     color: KIOSK_CONFIG.colors.textPrimary,
     fontWeight: '700',
   },
+  webModalTitle: {
+    marginTop: 18,
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontWeight: '700',
+  },
   modalBody: {
     marginTop: 16,
     color: KIOSK_CONFIG.colors.textSecondary,
     fontWeight: '500',
+  },
+  webUrlBar: {
+    marginTop: 14,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: KIOSK_CONFIG.colors.surfaceRaised,
+  },
+  webUrlText: {
+    color: KIOSK_CONFIG.colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  webViewFrame: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#FFFFFF',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  webStateOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingHorizontal: 28,
+    backgroundColor: 'rgba(9,13,18,0.92)',
+  },
+  webLoadingText: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  webStateTitle: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  webStateBody: {
+    maxWidth: 560,
+    color: KIOSK_CONFIG.colors.textSecondary,
+    fontSize: 17,
+    fontWeight: '500',
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  webStateActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
   },
   modalFooter: {
     marginTop: 22,
@@ -374,6 +1088,44 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: KIOSK_CONFIG.colors.textPrimary,
     fontSize: 18,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    minWidth: 112,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  secondaryButtonPressed: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  secondaryButtonText: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  retryButton: {
+    minWidth: 112,
+    minHeight: 52,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,216,74,0.22)',
+    backgroundColor: 'rgba(255,216,74,0.14)',
+  },
+  retryButtonPressed: {
+    backgroundColor: 'rgba(255,216,74,0.22)',
+  },
+  retryButtonText: {
+    color: KIOSK_CONFIG.colors.textPrimary,
+    fontSize: 17,
     fontWeight: '700',
   },
 });

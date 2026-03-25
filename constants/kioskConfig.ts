@@ -9,14 +9,25 @@ export const KIOSK_CONFIG = {
   idleTimeoutMs: 45_000,
 
   colors: {
-    background: '#040608',
-    frame: '#091017',
-    frameTint: 'rgba(4, 8, 12, 0.64)',
+    background: '#030507',
+    frame: '#08111A',
+    frameTint: 'rgba(3, 7, 11, 0.82)',
     border: 'rgba(255,255,255,0.10)',
     textPrimary: '#F4F7FA',
     textSecondary: 'rgba(231,237,243,0.80)',
+    textMuted: 'rgba(214,223,232,0.56)',
     accent: '#FFD84A',
     accentSoft: 'rgba(255,216,74,0.18)',
+    brandBlue: '#2B6D98',
+    brandBlueSoft: 'rgba(43,109,152,0.22)',
+    surface: 'rgba(8, 13, 18, 0.92)',
+    surfaceRaised: 'rgba(14, 22, 31, 0.96)',
+    panel: 'rgba(8, 13, 18, 0.76)',
+    panelRaised: 'rgba(12, 18, 26, 0.88)',
+    buttonSurface: 'rgba(9, 15, 22, 0.96)',
+    buttonSurfaceActive: 'rgba(15, 24, 34, 0.98)',
+    buttonBorder: 'rgba(255,255,255,0.10)',
+    buttonBorderActive: 'rgba(255,216,74,0.42)',
     modalSurface: 'rgba(10, 14, 19, 0.96)',
     modalSurfaceRaised: 'rgba(17, 23, 31, 0.94)',
   },
@@ -25,22 +36,22 @@ export const KIOSK_CONFIG = {
     /**
      * Visible dot diameter (the "indicator" shown over the poster).
      */
-    dotSize: 18,
+    dotSize: 20,
 
     /**
      * Visible outer ring around the indicator.
      */
-    ringSize: 34,
+    ringSize: 38,
 
     /**
      * Animated halo used to keep the hotspot visible from a distance.
      */
-    haloSize: 58,
+    haloSize: 64,
 
     /**
      * Touchable diameter (invisible press target) for finger usability.
      */
-    pressSize: 78,
+    pressSize: 84,
 
     /**
      * Extra forgiveness around the hotspot for quick trade-show taps.
@@ -70,11 +81,11 @@ export const KIOSK_CONFIG = {
   },
 
   stage: {
-    frameRadius: 30,
+    frameRadius: 36,
   },
 
   modal: {
-    maxWidth: 1080,
+    maxWidth: 980,
     dimBackground: 'rgba(3, 5, 8, 0.82)',
     eyebrow: 'Engineering highlight',
   },

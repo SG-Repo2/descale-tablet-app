@@ -101,8 +101,10 @@ export function Hotspot(props: {
           {
             width: KIOSK_CONFIG.hotspot.ringSize,
             height: KIOSK_CONFIG.hotspot.ringSize,
-            borderColor: isActive ? KIOSK_CONFIG.hotspot.color : 'rgba(255,255,255,0.18)',
-            backgroundColor: isActive ? 'rgba(255,216,74,0.12)' : 'rgba(4,8,12,0.74)',
+            borderColor: isActive ? KIOSK_CONFIG.hotspot.color : KIOSK_CONFIG.colors.buttonBorder,
+            backgroundColor: isActive
+              ? 'rgba(255,216,74,0.12)'
+              : KIOSK_CONFIG.colors.surface,
           },
         ]}
       />
