@@ -3,10 +3,11 @@
     "name": "descale-tablet-app",
     "slug": "descale-tablet-app",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
+    "backgroundColor": "#040608",
     "icon": "./assets/images/icon.png",
     "scheme": "descaletabletapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -19,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.groebe1kenobi.descaletabletapp"
     },
     "web": {
       "output": "static",
@@ -33,9 +35,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#040608",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#040608"
           }
         }
       ]
@@ -43,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c544d87-f2d0-4871-8a8b-00ad807db448"
+      }
     }
   }
 }

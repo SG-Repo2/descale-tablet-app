@@ -1,24 +1,36 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { KIOSK_CONFIG } from '@/constants/kioskConfig';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
-
+/**
+ * Root navigation for the trade-show kiosk.
+ * The app stays on a single fullscreen route with no stack chrome.
+ */
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(KIOSK_CONFIG.colors.background).catch(() => {
+      // Ignore platform-specific failures; the in-app background color still applies.
+    });
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <SafeAreaProvider>
+      <StatusBar hidden style="light" translucent />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'none',
+          gestureEnabled: false,
+          contentStyle: {
+            backgroundColor: KIOSK_CONFIG.colors.background,
+          },
+        }}>
+        <Stack.Screen name="index" />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
