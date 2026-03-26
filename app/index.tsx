@@ -561,9 +561,13 @@ export default function KioskScreen() {
                     style={styles.webView}
                     onError={(event) => {
                       setIsWebViewLoading(false);
-                      setWebViewError(
-                        event.nativeEvent.description || 'Unable to load the page in kiosk mode.'
-                      );
+                      const errorMsg = event.nativeEvent.description || 'Unable to load the page in kiosk mode.';
+                      // Check for SSL-related errors
+                      if (errorMsg.toLowerCase().includes('ssl')) {
+                        setWebViewError(`SSL Certificate Error: ${errorMsg}. Please verify your device's date/time is correct, or contact support.`);
+                      } else {
+                        setWebViewError(errorMsg);
+                      }
                     }}
                     onHttpError={(event) => {
                       setIsWebViewLoading(false);
