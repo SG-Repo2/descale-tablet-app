@@ -131,19 +131,7 @@ export function KioskNavButton(props: {
         ]}
       />
 
-      <View
-        style={[
-          styles.accentStrip,
-          {
-            top: Math.max(14, Math.round(size * 0.08)),
-            width: size * 0.28,
-            height: Math.max(4, Math.round(size * 0.024)),
-            backgroundColor: isActive
-              ? KIOSK_CONFIG.colors.accent
-              : KIOSK_CONFIG.colors.brandBlue,
-          },
-        ]}
-      />
+
 
       <View style={[styles.content, contentStyle]}>
         {hasEyebrow ? (

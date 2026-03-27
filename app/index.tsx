@@ -158,7 +158,7 @@ export default function KioskScreen() {
   );
   const webModalHeight = Math.min(
     displayHeight - maxVerticalInset * 2 - modalVerticalPadding * 2,
-    960
+    1000
   );
   const modalTitleSize = isLargeDisplay ? 36 : 30;
   const modalBodySize = isLargeDisplay ? 21 : 18;
@@ -562,11 +562,6 @@ export default function KioskScreen() {
                   },
                 ]}>
                 <View style={styles.webModalHeader}>
-                  <View style={styles.modalEyebrowRow}>
-                    <View style={styles.modalEyebrowAccent} />
-                    <Text style={styles.modalEyebrow}>{activeWebModal.eyebrow}</Text>
-                  </View>
-
                   <View style={styles.webModalHeaderActions}>
                     <Pressable
                       accessibilityRole="button"
@@ -589,23 +584,6 @@ export default function KioskScreen() {
                       <Text style={styles.closeButtonText}>Close</Text>
                     </Pressable>
                   </View>
-                </View>
-
-                <Text
-                  style={[
-                    styles.webModalTitle,
-                    {
-                      fontSize: webModalTitleSize,
-                      lineHeight: webModalTitleSize + 6,
-                    },
-                  ]}>
-                  {activeWebModal.title}
-                </Text>
-
-                <View style={styles.webUrlBar}>
-                  <Text numberOfLines={1} style={styles.webUrlText}>
-                    {activeWebModal.url}
-                  </Text>
                 </View>
 
                 <View style={styles.webViewFrame}>
@@ -677,10 +655,6 @@ export default function KioskScreen() {
                       </View>
                     </View>
                   ) : null}
-                </View>
-
-                <View style={styles.modalFooter}>
-                  <Text style={styles.modalHint}>{activeWebModal.hint}</Text>
                 </View>
               </View>
             ) : (
