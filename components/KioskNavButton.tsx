@@ -28,6 +28,10 @@ const ACTION_META = {
   },
 } as const;
 
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
 function getIconColor(isActive: boolean) {
   return isActive ? KIOSK_CONFIG.colors.accent : KIOSK_CONFIG.colors.textPrimary;
 }
@@ -61,16 +65,28 @@ export function KioskNavButton(props: {
   const { item, size, isActive = false, isDimmed = false, onPress } = props;
   const actionMeta = ACTION_META[item.actionType];
   const hasLogoImage = Boolean(item.imageSource);
+  const hasEyebrow = item.eyebrow.trim().length > 0;
+  const hasSupportingText = item.supportingText.trim().length > 0;
+  const hasSecondaryCopy = hasEyebrow || hasSupportingText;
   const sanitizedLabel = item.label.replace(/\n/g, ' ');
-  const iconWellSize = Math.round(size * (hasLogoImage ? 0.36 : 0.3));
-  const contentPadding = Math.max(20, Math.round(size * 0.125));
-  const labelSize = size >= 235 ? 26 : size >= 205 ? 23 : 21;
-  const supportingSize = size >= 235 ? 14 : 13;
-  const imageGraphicSize = iconWellSize * 0.72;
-  const iconGraphicSize = iconWellSize * 0.54;
+  const iconWellSize = Math.round(size * (hasLogoImage ? 0.33 : 0.29));
+  const contentPadding = Math.max(16, Math.round(size * 0.105));
+  const contentGap = Math.max(8, Math.round(size * 0.04));
+  const labelSize = size >= 220 ? 24 : size >= 190 ? 21 : 19;
+  const supportingSize = size >= 220 ? 14 : 12;
+  const eyebrowSize = size >= 210 ? 12 : 11;
+  const imageGraphicSize = iconWellSize * 0.7;
+  const iconGraphicSize = iconWellSize * 0.52;
+  const contentStyle: ViewStyle = {
+    paddingHorizontal: contentPadding,
+    paddingTop: contentPadding,
+    paddingBottom: Math.max(12, Math.round(size * 0.09)),
+    justifyContent: hasSecondaryCopy ? 'space-between' : 'center',
+    gap: hasSecondaryCopy ? Math.max(4, Math.round(size * 0.025)) : contentGap,
+  };
   const actionChipStyle: ViewStyle = {
-    paddingHorizontal: Math.max(12, Math.round(size * 0.07)),
-    minHeight: Math.max(28, Math.round(size * 0.15)),
+    paddingHorizontal: Math.max(10, Math.round(size * 0.06)),
+    minHeight: Math.max(26, Math.round(size * 0.135)),
   };
 
   return (
@@ -119,7 +135,9 @@ export function KioskNavButton(props: {
         style={[
           styles.accentStrip,
           {
-            width: size * 0.3,
+            top: Math.max(14, Math.round(size * 0.08)),
+            width: size * 0.28,
+            height: Math.max(4, Math.round(size * 0.024)),
             backgroundColor: isActive
               ? KIOSK_CONFIG.colors.accent
               : KIOSK_CONFIG.colors.brandBlue,
@@ -127,8 +145,10 @@ export function KioskNavButton(props: {
         ]}
       />
 
-      <View style={[styles.content, { paddingHorizontal: contentPadding, paddingVertical: contentPadding }]}>
-        <Text style={styles.eyebrow}>{item.eyebrow}</Text>
+      <View style={[styles.content, contentStyle]}>
+        {hasEyebrow ? (
+          <Text style={[styles.eyebrow, { fontSize: eyebrowSize }]}>{item.eyebrow}</Text>
+        ) : null}
 
         <View
           style={[
@@ -137,7 +157,6 @@ export function KioskNavButton(props: {
               width: iconWellSize,
               height: iconWellSize,
               borderRadius: iconWellSize / 2,
-              marginBottom: Math.round(size * 0.08),
               backgroundColor: hasLogoImage
                 ? '#FFFFFF'
                 : isActive
@@ -173,26 +192,34 @@ export function KioskNavButton(props: {
             styles.label,
             {
               fontSize: labelSize,
-              lineHeight: labelSize + 5,
-              marginVertical: Math.round(size * 0.06),
+              lineHeight: labelSize + 4,
             },
           ]}>
           {item.label}
         </Text>
 
-        <Text
-          numberOfLines={2}
+        {hasSupportingText ? (
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.supportingText,
+              {
+                fontSize: supportingSize,
+                lineHeight: supportingSize + 4,
+              },
+            ]}>
+            {item.supportingText}
+          </Text>
+        ) : null}
+
+        <View
           style={[
-            styles.supportingText,
+            styles.actionChip,
+            actionChipStyle,
             {
-              fontSize: supportingSize,
-              lineHeight: supportingSize + 5,
+              marginTop: hasSecondaryCopy ? 0 : clamp(size * 0.01, 2, 4),
             },
           ]}>
-          {item.supportingText}
-        </Text>
-
-        <View style={[styles.actionChip, actionChipStyle]}>
           <MaterialCommunityIcons
             color={KIOSK_CONFIG.colors.textSecondary}
             name={actionMeta.icon as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
@@ -225,8 +252,6 @@ const styles = StyleSheet.create({
   },
   accentStrip: {
     position: 'absolute',
-    top: 20,
-    height: 5,
     borderRadius: 999,
     opacity: 0.92,
   },

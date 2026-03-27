@@ -108,6 +108,7 @@ function buildWebModalState(button: KioskExternalButton): ActiveWebModalState {
 export default function KioskScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const shouldReverseLandscape = true;
 
   const posterMeta = useMemo(() => RNImage.resolveAssetSource(POSTER_SOURCE), []);
 
@@ -121,27 +122,59 @@ export default function KioskScreen() {
 
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isLandscape = width >= height;
-  const isLargeDisplay = width >= 1280;
-  const framePadding = isLargeDisplay ? 26 : 16;
-  const posterPaddingX = isLargeDisplay ? 40 : 24;
-  const posterPaddingY = height >= 850 ? 34 : 20;
-  const modalWidth = Math.min(width - Math.max(insets.left, insets.right) * 2 - 64, KIOSK_CONFIG.modal.maxWidth);
-  const webModalWidth = Math.min(width - Math.max(insets.left, insets.right) * 2 - 44, 1400);
-  const webModalHeight = Math.min(height - Math.max(insets.top, insets.bottom) * 2 - 36, 860);
-  const modalTitleSize = isLargeDisplay ? 38 : 32;
-  const modalBodySize = isLargeDisplay ? 23 : 19;
-  const webModalTitleSize = isLargeDisplay ? 30 : 26;
-  const stageHorizontalPadding = isLargeDisplay ? 30 : 18;
-  const stageVerticalPadding = height >= 900 ? 28 : 18;
-  const contentGap = clamp(width * 0.012, 12, 22);
-  const topRailGap = clamp(width * 0.02, 12, 28);
-  const buttonSize = clamp(
-    Math.min(width * (isLandscape ? 0.155 : 0.205), (height - insets.top - insets.bottom - 180) / 3),
-    172,
-    isLargeDisplay ? 248 : 216
+  const displayWidth = Math.max(width, height);
+  const displayHeight = Math.min(width, height);
+  const effectiveInsets = shouldReverseLandscape
+    ? {
+        top: insets.bottom,
+        right: insets.left,
+        bottom: insets.top,
+        left: insets.right,
+      }
+    : insets;
+  const maxHorizontalInset = Math.max(effectiveInsets.left, effectiveInsets.right);
+  const maxVerticalInset = Math.max(effectiveInsets.top, effectiveInsets.bottom);
+  const isLargeDisplay = displayWidth >= 1400 || displayHeight >= 900;
+  const framePadding = clamp(displayHeight * 0.02, 12, 24);
+  const posterPaddingX = clamp(displayWidth * 0.02, 18, 32);
+  const posterPaddingY = clamp(displayHeight * 0.022, 14, 28);
+  const modalHorizontalPadding = clamp(displayWidth * 0.028, 20, 36);
+  const modalVerticalPadding = clamp(displayHeight * 0.028, 20, 30);
+  const modalCardPaddingHorizontal = clamp(displayWidth * 0.024, 24, 36);
+  const modalCardPaddingVertical = clamp(displayHeight * 0.036, 22, 34);
+  const webModalCardPaddingHorizontal = clamp(displayWidth * 0.017, 20, 24);
+  const webModalCardPaddingTop = clamp(displayHeight * 0.03, 20, 24);
+  const webModalCardPaddingBottom = clamp(displayHeight * 0.022, 14, 18);
+  const posterFooterPaddingX = clamp(displayWidth * 0.012, 14, 18);
+  const posterFooterPaddingY = clamp(displayHeight * 0.012, 8, 12);
+  const posterLegendDotSize = clamp(displayHeight * 0.014, 10, 14);
+  const modalWidth = Math.min(
+    displayWidth - maxHorizontalInset * 2 - modalHorizontalPadding * 2,
+    KIOSK_CONFIG.modal.maxWidth
   );
-  const stageTitleSize = isLargeDisplay ? 34 : 28;
+  const webModalWidth = Math.min(
+    displayWidth - maxHorizontalInset * 2 - clamp(displayWidth * 0.024, 18, 30) * 2,
+    1320
+  );
+  const webModalHeight = Math.min(
+    displayHeight - maxVerticalInset * 2 - modalVerticalPadding * 2,
+    820
+  );
+  const modalTitleSize = isLargeDisplay ? 36 : 30;
+  const modalBodySize = isLargeDisplay ? 21 : 18;
+  const webModalTitleSize = isLargeDisplay ? 28 : 24;
+  const stageHorizontalPadding = clamp(displayWidth * 0.015, 16, 28);
+  const stageVerticalPadding = clamp(displayHeight * 0.02, 14, 24);
+  const stageGap = clamp(displayHeight * 0.015, 10, 16);
+  const contentGap = clamp(displayWidth * 0.009, 10, 18);
+  const topRailGap = clamp(displayWidth * 0.012, 8, 18);
+  const buttonSize = clamp(
+    Math.min(displayWidth * 0.14, displayHeight * 0.235),
+    160,
+    isLargeDisplay ? 224 : 198
+  );
+  const stageTitleSize = clamp(displayWidth * 0.041, 52, 72);
+  const stageTitleLineHeight = stageTitleSize + clamp(displayHeight * 0.012, 8, 12);
 
   const leftButtons = useMemo(
     () =>
@@ -349,126 +382,145 @@ export default function KioskScreen() {
 
   return (
     <View style={styles.root} onTouchStart={registerInteraction}>
-      <View style={styles.ambientLayer} pointerEvents="none">
-        <View style={[styles.ambientOrb, styles.ambientOrbLeft]} />
-        <View style={[styles.ambientOrb, styles.ambientOrbRight]} />
-      </View>
+      <View style={[styles.screenCanvas, shouldReverseLandscape && styles.reverseLandscape]}>
+        <View style={styles.ambientLayer} pointerEvents="none">
+          <View style={[styles.ambientOrb, styles.ambientOrbLeft]} />
+          <View style={[styles.ambientOrb, styles.ambientOrbRight]} />
+        </View>
 
-      <View
-        style={[
-          styles.frame,
-          {
-            paddingTop: Math.max(insets.top, framePadding),
-            paddingBottom: Math.max(insets.bottom, framePadding),
-            paddingLeft: Math.max(insets.left, framePadding),
-            paddingRight: Math.max(insets.right, framePadding),
-          },
-        ]}>
-        <View style={styles.stageFrame}>
-          <RNImage source={POSTER_SOURCE} resizeMode="cover" style={styles.stageBackground} />
-          <View style={styles.stageTint} />
-          <View style={styles.stageGlowLeft} />
-          <View style={styles.stageGlowRight} />
+        <View
+          style={[
+            styles.frame,
+            {
+              paddingTop: Math.max(effectiveInsets.top, framePadding),
+              paddingBottom: Math.max(effectiveInsets.bottom, framePadding),
+              paddingLeft: Math.max(effectiveInsets.left, framePadding),
+              paddingRight: Math.max(effectiveInsets.right, framePadding),
+            },
+          ]}>
+          <View style={styles.stageFrame}>
+            <RNImage source={POSTER_SOURCE} resizeMode="cover" style={styles.stageBackground} />
+            <View style={styles.stageTint} />
+            <View style={styles.stageGlowLeft} />
+            <View style={styles.stageGlowRight} />
 
-          <View
-            style={[
-              styles.stageContent,
-              {
-                paddingHorizontal: stageHorizontalPadding,
-                paddingVertical: stageVerticalPadding,
-              },
-            ]}>
-            <View style={[styles.topRail, { gap: topRailGap, justifyContent: 'center' }]}>
-              <View style={[styles.brandBlock, { alignItems: 'center' }]}>
-    
-                <Text style={[styles.brandTitle, { fontSize: (stageTitleSize + 8) * 2, lineHeight: (stageTitleSize + 16) * 2 }]}>
-                Upscale your descale.
-                </Text>
-              </View>
-
-            </View>
-
-            <View style={[styles.contentRow, { gap: contentGap }]}>
-              <KioskNavColumn
-                activeId={activeNavButtonId}
-                buttonSize={buttonSize}
-                isDimmed={hasOverlayOpen}
-                items={leftButtons}
-                onPress={(button) => {
-                  void handleSelectSideButton(button);
-                }}
-                side="left"
-              />
-
-              <View style={styles.centerColumn}>
-
-
-                <View style={styles.posterCard}>
-                  <View style={styles.posterCardGlow} pointerEvents="none" />
-                  <View style={styles.posterCanvas} pointerEvents="box-none">
-                    <View
-                      style={[
-                        styles.posterCanvasInner,
-                        {
-                          paddingHorizontal: posterPaddingX,
-                          paddingVertical: posterPaddingY,
-                        },
-                      ]}>
-                      <View
-                        style={styles.posterStage}
-                        onLayout={(event) => {
-                          const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
-                          handlePosterLayout(layoutWidth, layoutHeight);
-                        }}>
-                        <RNImage source={POSTER_SOURCE} resizeMode="contain" style={styles.posterImage} />
-
-                        <View style={styles.hotspotLayer} pointerEvents="box-none">
-                          {posterBounds
-                            ? HOTSPOTS.map((hotspot) => {
-                                const centerX =
-                                  posterBounds.offsetX + posterBounds.renderedW * (hotspot.x / 100);
-                                const centerY =
-                                  posterBounds.offsetY + posterBounds.renderedH * (hotspot.y / 100);
-
-                                return (
-                                  <Hotspot
-                                    key={hotspot.id}
-                                    title={hotspot.title}
-                                    centerX={centerX}
-                                    centerY={centerY}
-                                    isActive={hotspot.id === activeHotspotId}
-                                    isMuted={activeHotspotId !== null && hotspot.id !== activeHotspotId}
-                                    attractMode={activeHotspotId === null}
-                                    onPress={() => handleSelectHotspot(hotspot.id)}
-                                  />
-                                );
-                              })
-                            : null}
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.posterFooter}>
-                    <View style={styles.posterLegend}>
-                      <View style={styles.posterLegendDot} />
-                  
-                    </View>
-
-                  </View>
+            <View
+              style={[
+                styles.stageContent,
+                {
+                  gap: stageGap,
+                  paddingHorizontal: stageHorizontalPadding,
+                  paddingVertical: stageVerticalPadding,
+                },
+              ]}>
+              <View style={[styles.topRail, { gap: topRailGap, justifyContent: 'center' }]}>
+                <View style={[styles.brandBlock, { alignItems: 'center' }]}>
+                  <Text
+                    style={[
+                      styles.brandTitle,
+                      {
+                        fontSize: stageTitleSize,
+                        lineHeight: stageTitleLineHeight,
+                      },
+                    ]}>
+                    Upscale your descale.
+                  </Text>
                 </View>
               </View>
 
-              <KioskNavColumn
-                activeId={activeNavButtonId}
-                buttonSize={buttonSize}
-                isDimmed={hasOverlayOpen}
-                items={rightButtons}
-                onPress={(button) => {
-                  void handleSelectSideButton(button);
-                }}
-                side="right"
-              />
+              <View style={[styles.contentRow, { gap: contentGap }]}>
+                <KioskNavColumn
+                  activeId={activeNavButtonId}
+                  buttonSize={buttonSize}
+                  isDimmed={hasOverlayOpen}
+                  items={leftButtons}
+                  onPress={(button) => {
+                    void handleSelectSideButton(button);
+                  }}
+                  side="left"
+                />
+
+                <View style={styles.centerColumn}>
+                  <View style={styles.posterCard}>
+                    <View style={styles.posterCardGlow} pointerEvents="none" />
+                    <View style={styles.posterCanvas} pointerEvents="box-none">
+                      <View
+                        style={[
+                          styles.posterCanvasInner,
+                          {
+                            paddingHorizontal: posterPaddingX,
+                            paddingVertical: posterPaddingY,
+                          },
+                        ]}>
+                        <View
+                          style={styles.posterStage}
+                          onLayout={(event) => {
+                            const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
+                            handlePosterLayout(layoutWidth, layoutHeight);
+                          }}>
+                          <RNImage source={POSTER_SOURCE} resizeMode="contain" style={styles.posterImage} />
+
+                          <View style={styles.hotspotLayer} pointerEvents="box-none">
+                            {posterBounds
+                              ? HOTSPOTS.map((hotspot) => {
+                                  const centerX =
+                                    posterBounds.offsetX + posterBounds.renderedW * (hotspot.x / 100);
+                                  const centerY =
+                                    posterBounds.offsetY + posterBounds.renderedH * (hotspot.y / 100);
+
+                                  return (
+                                    <Hotspot
+                                      key={hotspot.id}
+                                      title={hotspot.title}
+                                      centerX={centerX}
+                                      centerY={centerY}
+                                      isActive={hotspot.id === activeHotspotId}
+                                      isMuted={activeHotspotId !== null && hotspot.id !== activeHotspotId}
+                                      attractMode={activeHotspotId === null}
+                                      onPress={() => handleSelectHotspot(hotspot.id)}
+                                    />
+                                  );
+                                })
+                              : null}
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.posterFooter,
+                        {
+                          paddingHorizontal: posterFooterPaddingX,
+                          paddingVertical: posterFooterPaddingY,
+                        },
+                      ]}>
+                      <View style={styles.posterLegend}>
+                        <View
+                          style={[
+                            styles.posterLegendDot,
+                            {
+                              width: posterLegendDotSize,
+                              height: posterLegendDotSize,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                <KioskNavColumn
+                  activeId={activeNavButtonId}
+                  buttonSize={buttonSize}
+                  isDimmed={hasOverlayOpen}
+                  items={rightButtons}
+                  onPress={(button) => {
+                    void handleSelectSideButton(button);
+                  }}
+                  side="right"
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -484,11 +536,12 @@ export default function KioskScreen() {
         <View
           style={[
             styles.modalOverlay,
+            shouldReverseLandscape && styles.reverseLandscape,
             {
-              paddingTop: Math.max(insets.top, 24),
-              paddingBottom: Math.max(insets.bottom, 24),
-              paddingLeft: Math.max(insets.left, 24),
-              paddingRight: Math.max(insets.right, 24),
+              paddingTop: Math.max(effectiveInsets.top, modalVerticalPadding),
+              paddingBottom: Math.max(effectiveInsets.bottom, modalVerticalPadding),
+              paddingLeft: Math.max(effectiveInsets.left, modalHorizontalPadding),
+              paddingRight: Math.max(effectiveInsets.right, modalHorizontalPadding),
             },
           ]}
           onTouchStart={registerInteraction}>
@@ -503,6 +556,9 @@ export default function KioskScreen() {
                   {
                     width: webModalWidth,
                     height: webModalHeight,
+                    paddingHorizontal: webModalCardPaddingHorizontal,
+                    paddingTop: webModalCardPaddingTop,
+                    paddingBottom: webModalCardPaddingBottom,
                   },
                 ]}>
                 <View style={styles.webModalHeader}>
@@ -634,8 +690,8 @@ export default function KioskScreen() {
                   styles.modalCard,
                   {
                     width: modalWidth,
-                    paddingHorizontal: isLargeDisplay ? 36 : 28,
-                    paddingVertical: isLargeDisplay ? 34 : 26,
+                    paddingHorizontal: modalCardPaddingHorizontal,
+                    paddingVertical: modalCardPaddingVertical,
                   },
                 ]}>
                 <View style={styles.modalHeader}>
@@ -693,6 +749,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: KIOSK_CONFIG.colors.background,
+  },
+  screenCanvas: {
+    flex: 1,
+  },
+  reverseLandscape: {
+    transform: [{ rotate: '180deg' }],
   },
   ambientLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -753,7 +815,6 @@ const styles = StyleSheet.create({
   },
   stageContent: {
     flex: 1,
-    gap: 16,
   },
   topRail: {
     flexDirection: 'row',
@@ -809,7 +870,7 @@ const styles = StyleSheet.create({
   centerColumn: {
     flex: 1,
     minWidth: 0,
-    gap: 14,
+    gap: 10,
   },
   posterHeaderCard: {
     flexDirection: 'row',
@@ -886,9 +947,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 14,
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    gap: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.02)',
@@ -896,11 +955,9 @@ const styles = StyleSheet.create({
   posterLegend: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   posterLegendDot: {
-    width: 14,
-    height: 14,
     borderRadius: 999,
     backgroundColor: KIOSK_CONFIG.colors.accent,
   },
@@ -942,9 +999,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: KIOSK_CONFIG.colors.border,
     backgroundColor: KIOSK_CONFIG.colors.modalSurface,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 18,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 26,
