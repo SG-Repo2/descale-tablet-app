@@ -70,8 +70,8 @@ export function KioskNavButton(props: {
   const hasSecondaryCopy = hasEyebrow || hasSupportingText;
   const sanitizedLabel = item.label.replace(/\n/g, ' ');
   const iconWellSize = Math.round(size * (hasLogoImage ? 0.33 : 0.29));
-  const contentPadding = Math.max(16, Math.round(size * 0.105));
-  const contentGap = Math.max(8, Math.round(size * 0.04));
+  const contentPadding = Math.max(14, Math.round(size * 0.09));
+  const contentGap = Math.max(6, Math.round(size * 0.032));
   const labelSize = size >= 220 ? 24 : size >= 190 ? 21 : 19;
   const supportingSize = size >= 220 ? 14 : 12;
   const eyebrowSize = size >= 210 ? 12 : 11;
@@ -79,8 +79,8 @@ export function KioskNavButton(props: {
   const iconGraphicSize = iconWellSize * 0.52;
   const contentStyle: ViewStyle = {
     paddingHorizontal: contentPadding,
-    paddingTop: contentPadding,
-    paddingBottom: Math.max(12, Math.round(size * 0.09)),
+    paddingTop: Math.max(12, Math.round(size * 0.08)),
+    paddingBottom: Math.max(12, Math.round(size * 0.08)),
     justifyContent: hasSecondaryCopy ? 'space-between' : 'center',
     gap: hasSecondaryCopy ? Math.max(4, Math.round(size * 0.025)) : contentGap,
   };

@@ -75,6 +75,6 @@ export const HOTSPOTS: HotspotDefinition[] = [
     title: 'Seal System Optimization',
     body: 'Engineered seal upgrades reduce leakage, extend maintenance intervals, and improve environmental compliance.',
     x: 48,
-    y: 50,
+    y: 62,
   },
 ];
