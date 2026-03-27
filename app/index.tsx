@@ -136,17 +136,17 @@ export default function KioskScreen() {
   const maxVerticalInset = Math.max(effectiveInsets.top, effectiveInsets.bottom);
   const isLargeDisplay = displayWidth >= 1400 || displayHeight >= 900;
   const framePadding = clamp(displayHeight * 0.02, 12, 24);
-  const posterPaddingX = clamp(displayWidth * 0.02, 18, 32);
-  const posterPaddingY = clamp(displayHeight * 0.022, 14, 28);
+  const posterPaddingX = clamp(displayWidth * 0.01, 8, 16);
+  const posterPaddingY = clamp(displayHeight * 0.01, 6, 14);
   const modalHorizontalPadding = clamp(displayWidth * 0.028, 20, 36);
-  const modalVerticalPadding = clamp(displayHeight * 0.028, 20, 30);
+  const modalVerticalPadding = clamp(displayHeight * 0.016, 12, 20);
   const modalCardPaddingHorizontal = clamp(displayWidth * 0.024, 24, 36);
   const modalCardPaddingVertical = clamp(displayHeight * 0.036, 22, 34);
-  const webModalCardPaddingHorizontal = clamp(displayWidth * 0.017, 20, 24);
-  const webModalCardPaddingTop = clamp(displayHeight * 0.03, 20, 24);
-  const webModalCardPaddingBottom = clamp(displayHeight * 0.022, 14, 18);
-  const posterFooterPaddingX = clamp(displayWidth * 0.012, 14, 18);
-  const posterFooterPaddingY = clamp(displayHeight * 0.012, 8, 12);
+  const webModalCardPaddingHorizontal = clamp(displayWidth * 0.012, 14, 18);
+  const webModalCardPaddingTop = clamp(displayHeight * 0.018, 12, 16);
+  const webModalCardPaddingBottom = clamp(displayHeight * 0.012, 8, 12);
+  const posterFooterPaddingX = clamp(displayWidth * 0.008, 8, 14);
+  const posterFooterPaddingY = clamp(displayHeight * 0.006, 4, 8);
   const posterLegendDotSize = clamp(displayHeight * 0.014, 10, 14);
   const modalWidth = Math.min(
     displayWidth - maxHorizontalInset * 2 - modalHorizontalPadding * 2,
@@ -158,7 +158,7 @@ export default function KioskScreen() {
   );
   const webModalHeight = Math.min(
     displayHeight - maxVerticalInset * 2 - modalVerticalPadding * 2,
-    820
+    960
   );
   const modalTitleSize = isLargeDisplay ? 36 : 30;
   const modalBodySize = isLargeDisplay ? 21 : 18;
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     overflow: 'hidden',
-    borderRadius: 34,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: KIOSK_CONFIG.colors.border,
     backgroundColor: KIOSK_CONFIG.colors.surface,
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     elevation: 18,
   },
   webModalCard: {
-    borderRadius: 28,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: KIOSK_CONFIG.colors.border,
     backgroundColor: KIOSK_CONFIG.colors.modalSurface,
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   webModalTitle: {
-    marginTop: 18,
+    marginTop: 10,
     color: KIOSK_CONFIG.colors.textPrimary,
     fontWeight: '700',
   },
@@ -1059,11 +1059,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   webUrlBar: {
-    marginTop: 14,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: KIOSK_CONFIG.colors.surfaceRaised,
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   webViewFrame: {
     flex: 1,
     overflow: 'hidden',
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: '#FFFFFF',
@@ -1119,8 +1119,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   modalFooter: {
-    marginTop: 22,
-    paddingTop: 18,
+    marginTop: 14,
+    paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.16)',
   },
